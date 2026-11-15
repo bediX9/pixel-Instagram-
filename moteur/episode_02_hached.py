@@ -1,69 +1,37 @@
 """Épisode 02 (tunisien) — Farhat Hached : la voiture qui ne l'a jamais emmené à l'hôpital."""
 import subprocess, sys, os, math
+from functools import partial
 import numpy as np
 from PIL import Image, ImageDraw
 from moteur_pixel import W, H, ROUGE, texte_pixel, ease
 import moderne as Mo
-from moderne import rendre_m, CAST_M, route, ROUTE, voiture, camionnette
+from moderne import ROUTE
 import arabe
+import catalogue as K
+from outils import cam as _cam, bande as _bande, bulle as _bulle, T, sombre, secoue, big, fade, ecrire_textes, FPS, BLANC as B
 
-FPS, BAS, B = 30, 105, (255, 255, 255)
-HA = CAST_M['hached']
+BAS = 105
+cam = partial(_cam, fond=(40, 40, 50))     # fond de la route
+bande = partial(_bande, y1=520)
+bulle = partial(_bulle, taille=56)
+HA = K.spec('hached')
 
-# ---------------- outils (repris de l'épisode 01) ----------------
 def P(cv, spec, f, anim, cx, pieds, flip=False):
-    im = rendre_m(spec, f, anim)
-    if flip: im = im.transpose(Image.FLIP_LEFT_RIGHT)
-    cv.alpha_composite(im, (int(cx - 28), int(pieds - BAS)))
+    """Pose un personnage (nom du catalogue ou spec) ; flip = miroir."""
+    K.poser(cv, spec, f, anim, cx, pieds, flip=flip)
 
 def V(cv, im, x, bas=ROUTE, flip=False):
+    """Pose un véhicule (image) : roues sur la route."""
     if flip: im = im.transpose(Image.FLIP_LEFT_RIGHT)
     cv.alpha_composite(im, (int(x), int(bas - im.height)))
-
-def cam(cv, k, x0, y0, fond=(40, 40, 50)):
-    w, h = W // k, H // k
-    x0, y0 = int(round(x0)), int(round(y0))
-    ext = Image.new("RGBA", (max(cv.width, x0 + w) - min(0, x0), max(cv.height, y0 + h)), fond + (255,))
-    ext.alpha_composite(cv.convert("RGBA"), (max(0, -x0), 0)); x0 = max(0, x0)
-    return ext.crop((x0, y0, x0 + w, y0 + h)).resize((W, H), Image.NEAREST)
-
-def bande(img, y0=170, y1=520):
-    a = np.array(img).astype(np.float32); y = np.arange(H)
-    g = np.clip(np.minimum((y - y0) / 50, (y1 - y) / 50), 0, 1)[:, None] * .62
-    a[..., :3] *= (1 - g[..., None]); return Image.fromarray(a.astype(np.uint8))
-
-def T(img, parts, y=232, taille=74): arabe.titre_ar(img, parts, y=y, taille=taille)
-
-def bulle(img, lignes, cx, cy, queue=-1, taille=56):
-    f = arabe.font(taille); d = ImageDraw.Draw(img)
-    ws = [d.textlength(l, font=f, direction='rtl', language='ar') for l in lignes]
-    lw, lh = max(ws), int(taille * 1.35)
-    x0, y0, x1, y1 = cx - lw / 2 - 34, cy - lh * len(lignes) / 2 - 18, cx + lw / 2 + 34, cy + lh * len(lignes) / 2 + 18
-    c = (252, 250, 244)
-    d.rounded_rectangle([x0 - 6, y0 - 6, x1 + 6, y1 + 6], 26, fill=(30, 20, 20)); d.rounded_rectangle([x0, y0, x1, y1], 22, fill=c)
-    if queue:
-        tx = cx + queue * lw / 4
-        d.polygon([(tx - 22, y1 - 2), (tx + queue * 70, y1 + 74), (tx + 22, y1 - 2)], fill=c)
-    for i, (l, w) in enumerate(zip(lignes, ws)):
-        d.text((cx - w / 2, y0 + 14 + i * lh), l, font=f, fill=(24, 10, 12), direction='rtl', language='ar')
-
-def sombre(img, k=.4, rouge=0.0):
-    a = np.array(img).astype(np.float32); a[..., :3] *= k; a[..., 0] *= 1 + rouge
-    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
-
-def secoue(img, l, amp=10):
-    dx, dy = int(amp * math.sin(l * 2.1)), int(amp * math.cos(l * 1.7))
-    out = Image.new("RGBA", img.size, (0, 0, 0, 255)); out.alpha_composite(img.convert("RGBA"), (dx, dy)); return out
-
-def big(sprite, k): return sprite.resize((sprite.width * k, sprite.height * k), Image.NEAREST)
 
 # ---------------- plans ----------------
 RY = 96  # haut de la fenêtre caméra x5 sur la route (384 de haut)
 
 def p1(l, n):   # accroche : la voiture s'éloigne dans le brouillard
-    cv = route(l, 'aube', brume=.0)
+    cv = K.decor('route_rades', l, heure='aube', brume=.0)
     x = 100 + 80 * ease(l / n)
-    V(cv, voiture(l // 2, carros=((40, 40, 46), (26, 26, 30)), vitres='sombre'), x)
+    V(cv, K.vehicule('voiture', l // 2, carros=((40, 40, 46), (26, 26, 30)), vitres='sombre'), x)
     Mo.brouillard(cv, l, .3 + .3 * l / n)
     lay = Image.new("RGBA", cv.size); ImageDraw.Draw(lay).ellipse([x - 6, ROUTE - 18, x + 6, ROUTE - 8], fill=(255, 40, 40, 150 if (l // 10) % 2 else 90)); cv.alpha_composite(lay)
     img = sombre(cam(cv, 5, 70, RY), .85)
@@ -73,7 +41,7 @@ def p1(l, n):   # accroche : la voiture s'éloigne dans le brouillard
     return img
 
 def p2(l, n):   # gros plan Hached
-    cv = route(l, 'aube')
+    cv = K.decor('route_rades', l, heure='aube')
     P(cv, HA, l // 6, 'idle', 200, ROUTE + 30)
     k = 9 - 1 * ease(l / n)
     w, h = W / k, H / k
@@ -82,7 +50,7 @@ def p2(l, n):   # gros plan Hached
     return img
 
 def p3(l, n):   # carte : Kerkennah
-    m = Mo.carte_maghreb(l, villes=('tunis', 'kerkennah'), pulse=('kerkennah',) if l > n * .5 else ())
+    m = K.decor('carte_maghreb', l, villes=('tunis', 'kerkennah'), pulse=('kerkennah',) if l > n * .5 else ())
     xt, yt = Mo.ll(*Mo.VILLES_M['tunis']); xk, yk = Mo.ll(*Mo.VILLES_M['kerkennah'])
     t = ease(l / (n * .7)); k = 6
     cx, cy = xt + (xk - xt) * t, yt + (yk - yt) * t + 20
@@ -92,7 +60,7 @@ def p3(l, n):   # carte : Kerkennah
     return img
 
 def p4(l, n):   # congrès 1946
-    cv = Mo.salle_congres(l)
+    cv = K.decor('salle_congres', l)
     sp = dict(HA, bras_d='leve', expr='crie' if (l // 8) % 2 else 'serieux')
     P(cv, sp, l // 5, 'idle', 108, 262)
     d = ImageDraw.Draw(cv); d.rectangle([60, 236, 156, 262], fill=(100, 66, 44)); d.rectangle([60, 236, 156, 240], fill=(130, 90, 60))
@@ -105,8 +73,8 @@ def p4(l, n):   # congrès 1946
     return img
 
 def p5(l, n):   # le télégramme du Résident général
-    cv = Mo.bureau(l)
-    P(cv, dict(CAST_M['resident'], bras_d='bureau', bras_g='bureau'), l // 6, 'idle', 120, 318)
+    cv = K.decor('bureau', l)
+    P(cv, dict(K.spec('resident'), bras_d='bureau', bras_g='bureau'), l // 6, 'idle', 120, 318)
     Mo.bureau_table(cv, l, papier=ease(max(0, l - 20) / (n * .6)))
     k = 5 + 2 * ease(max(0, l - n * .55) / (n * .45))
     kk = 5 if k < 6 else 7
@@ -118,7 +86,7 @@ def p5(l, n):   # le télégramme du Résident général
 TRACT = Mo.main_rouge()
 def p6(l, n):   # menaces
     fl = max(0, 1 - abs(l - n * .62) / 12) if l > n * .5 else 0
-    cv = Mo.maison_nuit(l, flash=fl)
+    cv = K.decor('maison_nuit', l, flash=fl)
     t = min(1, l / (n * .45))
     tr = Image.new("RGBA", (34, 40), (0, 0, 0, 0)); td = ImageDraw.Draw(tr)
     td.rectangle([0, 0, 33, 39], fill=(236, 230, 210)); td.rectangle([0, 0, 33, 39], outline=(150, 140, 120))
@@ -133,23 +101,23 @@ def p6(l, n):   # menaces
 
 CLAIRE = ((200, 196, 178), (150, 146, 130)); NOIRE = ((40, 40, 46), (26, 26, 30))
 def p7(l, n):   # départ de Radès, suivi
-    cv = route(l, 'aube')
+    cv = K.decor('route_rades', l, heure='aube')
     xa = 40 + 2.2 * l; xb = xa - 110 + 6 * math.sin(l / 20)
-    V(cv, voiture(l // 2, CLAIRE, phares=True), xa)
-    V(cv, voiture(l // 2, NOIRE, vitres='sombre'), xb)
+    V(cv, K.vehicule('voiture', l // 2, CLAIRE, phares=True), xa)
+    V(cv, K.vehicule('voiture', l // 2, NOIRE, vitres='sombre'), xb)
     img = bande(cam(cv, 5, min(xa - 130, 640 - 216), RY))
     T(img, [("رادس", ROUGE), ("الصباح", B)])
     return img
 
 def p8(l, n):   # les rafales
-    cv = route(l + 105, 'aube')
+    cv = K.decor('route_rades', l + 105, heure='aube')
     base = 40 + 2.2 * 105
     stop = min(1, l / (n * .7))
     xa = base + 60 * ease(stop)
     xb = base - 120 + (2.4 * l if l < 40 else 96 + 6 * (l - 40))
     tir = 12 < l < 40 and (l // 2) % 2 == 0
-    V(cv, voiture(l // 2, NOIRE, vitres='sombre', flash=tir), xb)
-    V(cv, voiture(0 if stop >= 1 else l // 2, CLAIRE, impact=l > 16), xa)
+    V(cv, K.vehicule('voiture', l // 2, NOIRE, vitres='sombre', flash=tir), xb)
+    V(cv, K.vehicule('voiture', 0 if stop >= 1 else l // 2, CLAIRE, impact=l > 16), xa)
     img = cam(cv, 5, base - 90, RY)
     if 12 < l < 42: img = secoue(img, l, 12)
     if tir:
@@ -159,27 +127,27 @@ def p8(l, n):   # les rafales
     return img
 
 def p9(l, n):   # blessé, la camionnette
-    cv = route(l + 180, 'aube')
+    cv = K.decor('route_rades', l + 180, heure='aube')
     base = 40 + 2.2 * 105 + 60
-    V(cv, voiture(0, CLAIRE, impact=True, roule=False), base)
+    V(cv, K.vehicule('voiture', 0, CLAIRE, impact=True, roule=False), base)
     t = ease(l / (n * .6))
-    V(cv, camionnette(l // 2, roule=t < 1), base - 330 + 210 * t)
+    V(cv, K.vehicule('camionnette', l // 2, roule=t < 1), base - 330 + 210 * t)
     P(cv, HA, l // 5, 'blesse', base - 22, ROUTE + 6)
     img = bande(cam(cv, 5, base - 130, RY))
     T(img, [("مازال", B), ("حي", ROUGE)], taille=84)
     return img
 
 def p10(l, n):  # la deuxième voiture
-    cv = route(l + 285, 'aube')
+    cv = K.decor('route_rades', l + 285, heure='aube')
     base = 40 + 2.2 * 105 + 60
     xv = base + 10
     if l < n * .55:
-        V(cv, voiture(0, NOIRE, vitres='sombre', roule=False), xv)
+        V(cv, K.vehicule('voiture', 0, NOIRE, vitres='sombre', roule=False), xv)
         P(cv, HA, l // 5, 'blesse', base - 40 + 70 * ease(l / (n * .5)), ROUTE + 6)
     else:
         t = (l - n * .55) / (n * .45)
-        V(cv, voiture(l // 2, NOIRE, vitres='sombre'), xv + 120 * t * t)
-    V(cv, camionnette(0, roule=False), base - 120)
+        V(cv, K.vehicule('voiture', l // 2, NOIRE, vitres='sombre'), xv + 120 * t * t)
+    V(cv, K.vehicule('camionnette', 0, roule=False), base - 120)
     Mo.brouillard(cv, l, .2 + .45 * l / n)
     img = bande(cam(cv, 5, base - 110, RY))
     T(img, [("شكون", ROUGE), ("كان فيها", B), ("؟", ROUGE)], taille=84)
@@ -187,7 +155,7 @@ def p10(l, n):  # la deuxième voiture
 
 CHAP = Mo.chapeau_sol()
 def p11(l, n):  # la route vide
-    cv = route(l + 400, 'aube', brume=0)
+    cv = K.decor('route_rades', l + 400, heure='aube', brume=0)
     base = 40 + 2.2 * 105 + 60
     cv.alpha_composite(CHAP, (int(base + 120), ROUTE + 18))
     Mo.brouillard(cv, l, .45)
@@ -210,7 +178,7 @@ def p12(l, n):  # la nouvelle, le pays s'embrase
         texte_pixel(img, "12:00", W // 2, 640, px=10, col=(240, 240, 240))
     else:
         t = ease((l - n * .35) / (n * .55))
-        m = Mo.carte_maghreb(l, villes=('tunis', 'alger', 'casablanca'), pulse=('tunis', 'alger', 'casablanca'))
+        m = K.decor('carte_maghreb', l, villes=('tunis', 'alger', 'casablanca'), pulse=('tunis', 'alger', 'casablanca'))
         xt, yt = Mo.ll(*Mo.VILLES_M['tunis']); xc, yc = Mo.ll(*Mo.VILLES_M['casablanca'])
         cx = xt + (xc - xt) * t
         img = cam(m, 4, cx - 135, (yt + yc) / 2 - 220, fond=(54, 110, 206))
@@ -263,7 +231,7 @@ def p15(l, n):  # archives 2013
     if not o:
         texte_pixel(img, "SECRET", W // 2, y0 + 300, px=12)
     else:
-        ph = rendre_m(dict(HA, expr='serieux'), 0, 'idle').crop((14, 10, 42, 52))
+        ph = K.sprite(dict(HA, expr='serieux'), 0, 'idle').crop((14, 10, 42, 52))
         ph = big(ph, 9); img.alpha_composite(ph, (x0 + 9 * 11, y0 + 14 * 11))
         lignes = ["SDECE", "DOMICILE", "VOITURES", "TRAJETS"]
         for i, t in enumerate(lignes):
@@ -275,7 +243,7 @@ def p15(l, n):  # archives 2013
 
 def p16(l, n):  # fin
     img = Mo.fond_sombre()
-    sp = rendre_m(dict(HA, expr='serieux'), l // 8, 'idle').crop((0, 0, 56, 80))
+    sp = K.sprite(dict(HA, expr='serieux'), l // 8, 'idle').crop((0, 0, 56, 80))
     b = big(sp, 9); img.alpha_composite(b, ((W - b.width) // 2, 560))
     a = np.array(img).astype(np.float32); y = np.arange(H)[:, None]; g = np.clip((y - 1000) / 280, 0, 1); a[..., :3] *= (1 - g[..., None] * .92)
     img = Image.fromarray(a.astype(np.uint8))
@@ -305,19 +273,6 @@ VO = ["5 ديسمبر 1952. راجل مجروح ركب في كرهبة باش ي
       "في 2013 فرنسا حلّت الأرشيف: المخابرات كانت تعرف دارو، كراهبو، ووين يمشي.",
       "فرحات حشاد، 38 سنة. والسؤال مازال: شكون كان في الكرهبة؟"]
 
-def tc(fr, sep=","):
-    s = fr / FPS; return f"{int(s // 3600):02d}:{int(s % 3600 // 60):02d}:{int(s % 60):02d}{sep}{int(round((s % 1) * 1000)):03d}"
-
-def fade(img, l, n, k=5):
-    a = min(1, (l + 1) / k, (n - l) / k)
-    return img if a >= 1 else Image.fromarray((np.asarray(img.convert("RGB")).astype(np.float32) * a).astype(np.uint8))
-
-def ecrire_textes():
-    srt, md, t0 = [], ["# Épisode 02 — Farhat Hached — Voix off (tunisien)\n", "| # | Début | Fin | Voix off |", "|---|---|---|---|"], 0
-    for i, ((fn, n), vo) in enumerate(zip(PLANS, VO)):
-        srt.append(f"{i + 1}\n{tc(t0)} --> {tc(t0 + n)}\n{vo}\n"); md.append(f"| {i + 1} | {tc(t0, '.')[3:]} | {tc(t0 + n, '.')[3:]} | {vo} |"); t0 += n
-    open('episode_02_hached.srt', 'w').write("\n".join(srt)); open('episode_02_hached_voixoff.md', 'w').write("\n".join(md) + "\n")
-
 def rendre_plan(i):
     fn, n = PLANS[i]
     tmp, out = f'scenes/s{i:02d}.tmp.mp4', f'scenes/s{i:02d}.mp4'
@@ -331,7 +286,7 @@ def rendre_plan(i):
     if p.wait() == 0: os.replace(tmp, out)
 
 def main():
-    ecrire_textes()
+    ecrire_textes(PLANS, VO, 'episode_02_hached', 'Épisode 02 — Farhat Hached')
     if 'stills' in sys.argv:
         for i, (fn, n) in enumerate(PLANS): fn(int(n * .8), n).convert("RGB").save(f'stills/a_{i:02d}.png')
         return

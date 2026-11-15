@@ -31,3 +31,6 @@ Prérequis système : Python 3 avec Pillow compilé avec **raqm** (texte arabe R
 ## Principes éditoriaux
 
 Anecdote vérifiée sur une source antique ou académique, dramatisation permise mais fond fidèle à la source, aucun fait ni chiffre inventé, pas d'anachronisme. Voir `docs/instructions_projet.md`.
+
+## Réutilisation
+Tous les éléments (personnages, décors, accessoires…) sont dans `moteur/catalogue.py` ; les aides communes dans `moteur/outils.py`. Tout nouvel élément doit y être ajouté et poussé.

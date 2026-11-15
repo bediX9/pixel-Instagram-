@@ -59,3 +59,6 @@ Hannibal (normal / casqué), Gisco, fantassin libyen, frondeur baléare, cavalie
 - Magon l'agronome, traduit sur ordre du Sénat romain.
 - 146 av. J.-C. : la chute de Carthage et le mythe moderne du « sel répandu ».
 - La mort d'Hannibal par poison en exil (183/181 av. J.-C.).
+
+## Règle de réutilisation (catalogue)
+Tout élément créé pour un épisode (personnage, variante d'expression/pose, décor, accessoire, animal, véhicule) entre dans `moteur/catalogue.py` et est poussé sur GitHub avant la fin de la discussion. Les épisodes n'appellent que `catalogue.py` (éléments) et `outils.py` (caméra, texte, bulles, fondus, sous-titres) : aucune variante ni aide locale dans un épisode. Voir la liste : `python3 catalogue.py` ; planche visuelle : `python3 catalogue.py planche`.

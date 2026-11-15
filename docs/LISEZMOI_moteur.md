@@ -31,3 +31,8 @@ Fichiers du moteur dans le dossier `moteur/`. Pour l'utiliser : `bash setup.sh` 
 - Vélites coiffés d'une peau de loup, hastati avec 3 plumes noires/pourpres et une seule jambière (Polybe 6.22-23).
 - Le décor en éclairs des scuta est surtout attesté à l'époque impériale : décor romain stylisé, pas une source de 216.
 - Pas d'aigle romaine en 216 (enseignes manipulaires ; l'aigle unique date de Marius).
+
+## catalogue.py et outils.py
+- `catalogue.py` : registre unique des personnages (antiques + modernes), variantes (ex. `gisco/peur`, `hached/poing_leve`), décors, accessoires, objets, animaux, véhicules. API : `poser`, `sprite`, `spec`, `decor`, `accessoire`, `animal`, `vehicule`, `lister`, `planche`.
+- `outils.py` : aides communes (`cam`, `bande`, `T`, `compte`, `bulle`, `sombre`, `secoue`, `big`, `fade`, `tc`, `ecrire_textes`).
+- Les épisodes 1 et 2 ont été migrés ; sortie vérifiée identique (116 images comparées par empreinte).

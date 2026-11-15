@@ -4,56 +4,23 @@ import numpy as np
 from PIL import Image, ImageDraw
 import moteur_pixel as M
 from moteur_pixel import W, H, ROUGE, texte_pixel, ease
-from personnages import CAST, rendre
 import accessoires as ACC
 import decors_v3 as D3
-from decors_v2 import _camp_punique
 import arabe
+import catalogue as K
+from outils import cam, bande, T, compte, bulle, fade, ecrire_textes, FPS, BLANC as B
 
-FPS, BAS, B = 30, 105, (255, 255, 255)
 SOL = D3.SOL
+BAS = K.BAS
 
-def P(cv, nom, f, anim, cx, pieds=SOL, spec=None, demi=False):
-    im = rendre(spec or CAST[nom], f, anim)
-    if demi:
-        im = im.resize((28, 56), Image.NEAREST); cv.alpha_composite(im, (int(cx - 14), int(pieds - 53)))
-    else:
-        cv.alpha_composite(im, (int(cx - 28), int(pieds - BAS)))
+def P(cv, nom, f, anim, cx, pieds=SOL, variante=None, demi=False):
+    """Pose un personnage du catalogue (sol de la colline par défaut)."""
+    K.poser(cv, nom, f, anim, cx, pieds, variante=variante, demi=demi)
 
-def cam(cv, k, x0, y0, fond=(120, 140, 60)):
-    w, h = W // k, H // k
-    if y0 + h > cv.height or x0 + w > cv.width or x0 < 0:
-        ext = Image.new("RGBA", (max(cv.width, x0 + w) + max(0, -x0), max(cv.height, y0 + h)), fond + (255,))
-        ext.paste(cv, (max(0, -x0), 0)); cv = ext; x0 = max(0, x0)
-    return cv.convert("RGBA").crop((x0, y0, x0 + w, y0 + h)).resize((W, H), Image.NEAREST)
+def deco(f, armee=True, camp=False): return K.decor('colline_mer', f, armee=armee, camp_punique=camp)
 
-def bande(img, y0=170, y1=500):
-    a = np.array(img).astype(np.float32); y = np.arange(H)
-    g = np.clip(np.minimum((y - y0) / 50, (y1 - y) / 50), 0, 1)[:, None] * .62
-    a[..., :3] *= (1 - g[..., None]); return Image.fromarray(a.astype(np.uint8))
-
-def T(img, parts, y=232, taille=74): arabe.titre_ar(img, parts, y=y, taille=taille)
-
-def compte(img, v, y=372, px=9): texte_pixel(img, f"{int(v):,}".replace(",", " "), W // 2, y, px=px)
-
-def bulle(img, lignes, cx, cy, queue=-1, taille=54):
-    f = arabe.font(taille); d = ImageDraw.Draw(img)
-    ws = [d.textlength(l, font=f, direction='rtl', language='ar') for l in lignes]
-    lw, lh = max(ws), int(taille * 1.35)
-    x0, y0, x1, y1 = cx - lw / 2 - 34, cy - lh * len(lignes) / 2 - 18, cx + lw / 2 + 34, cy + lh * len(lignes) / 2 + 18
-    c = (252, 250, 244)
-    d.rounded_rectangle([x0 - 6, y0 - 6, x1 + 6, y1 + 6], 26, fill=(30, 20, 20)); d.rounded_rectangle([x0, y0, x1, y1], 22, fill=c)
-    tx = cx + queue * lw / 4
-    d.polygon([(tx - 22, y1 - 2), (tx + queue * 70, y1 + 74), (tx + 22, y1 - 2)], fill=c)
-    for i, (l, w) in enumerate(zip(lignes, ws)):
-        d.text((cx - w / 2, y0 + 14 + i * lh), l, font=f, fill=(24, 10, 12), direction='rtl', language='ar')
-
-def deco(f, armee=True, camp=False): return D3.colline_mer(f, armee=armee, camp_punique=camp)
-
-G_PEUR = dict(CAST['gisco'], bras_d='menton')
-G_FIER = dict(CAST['gisco'], expr='sourire', bras_d='hanche', bras_g='hanche')
-G_SURPRIS = dict(CAST['gisco'], expr='surpris', bras_d='bas')
-H_PARLE = dict(CAST['hannibal'], expr='parle_serieux')
+G_FIER = K.spec('gisco', 'fier')
+G_SURPRIS = K.spec('gisco', 'surpris')
 
 # ---------------- plans ----------------
 def p1(l, n):
@@ -93,20 +60,20 @@ def p5(l, n):
     cv = deco(l // 3); k = ease(l / (n * .7))
     P(cv, 'porte_etendard', l // 6, 'idle', 86)
     P(cv, 'hannibal', l // 4, 'marche' if k < 1 else 'idle', 60 + 80 * k)
-    P(cv, None, l // 4, 'marche' if k < 1 else 'idle', 20 + 180 * k, spec=dict(CAST['gisco'], expr='neutre', bras_d='bas'))
+    P(cv, 'gisco', l // 4, 'marche' if k < 1 else 'idle', 20 + 180 * k, variante='neutre')
     img = bande(cam(cv, 5, 54, 110))
     T(img, [("فوق", B), ("هضبة", ROUGE)])
     return img
 
 def p6(l, n):
-    cv = deco(l // 3); P(cv, 'hannibal', l // 6, 'idle', 140); P(cv, None, l // 3, 'peur', 200, spec=G_PEUR)
+    cv = deco(l // 3); P(cv, 'hannibal', l // 6, 'idle', 140); P(cv, 'gisco', l // 3, 'peur', 200, variante='peur')
     img = bande(cam(cv, 8, 130, 236))
     T(img, [("جيسكو", ROUGE), ("خاف", B)])
     if l > 10: bulle(img, ["يا حنبعل", "ياسر برشا"], 640, 760, queue=1)
     return img
 
 def p7(l, n):
-    cv = deco(l // 3); P(cv, None, l // 8, 'idle', 140, spec=dict(CAST['hannibal'], expr='serieux')); P(cv, None, l // 3, 'peur', 200, spec=G_PEUR)
+    cv = deco(l // 3); P(cv, 'hannibal', l // 8, 'idle', 140, variante='serieux'); P(cv, 'gisco', l // 3, 'peur', 200, variante='peur')
     img = bande(cam(cv, 9, 100, 248))
     T(img, [("حنبعل", ROUGE)])
     return img
@@ -133,7 +100,7 @@ def p9(l, n):
     texte_pixel(img, "86 000", 280, 560, px=8)
     M.projecteur(img, 205, haut=150, bas=345, largeur=26, a=.8)
     spec = G_SURPRIS if l < n * .45 else G_FIER
-    g = rendre(spec, l // 5, 'idle'); g = g.resize((g.width * 6, g.height * 6), Image.NEAREST)
+    g = K.sprite(spec, l // 5, 'idle'); g = g.resize((g.width * 6, g.height * 6), Image.NEAREST)
     img.alpha_composite(g, (820 - g.width // 2, 1390 - BAS * 6))
     texte_pixel(img, "1", 900, 560, px=8); arabe.titre_ar(img, [("جيسكو", ROUGE)], y=530, taille=60, W=1440)
     arabe.titre_ar(img, [("⚔", B)], y=520, taille=56) if False else texte_pixel(img, "VS", W // 2 + 40, 900, px=6, col=(255, 255, 255))
@@ -192,18 +159,8 @@ VO = ["هاذي حكاية كيفاش حنبعل سلّك جيش كامل… ب�
       "والنهار هاكا، روما كلات طريحة من أكبر الطرايح في تاريخها.",
       "الحكاية هاذي يحكيها بلوتارخوس."]
 
-def tc(fr, sep=","):
-    s = fr / FPS; return f"{int(s // 3600):02d}:{int(s % 3600 // 60):02d}:{int(s % 60):02d}{sep}{int(round((s % 1) * 1000)):03d}"
-
-def fade(img, l, n, k=5):
-    a = min(1, (l + 1) / k, (n - l) / k)
-    return img if a >= 1 else Image.fromarray((np.asarray(img.convert("RGB")).astype(np.float32) * a).astype(np.uint8))
-
 def main():
-    srt, md, t0 = [], ["# Épisode 01 — Voix off (tunisien)\n", "| Début | Fin | Voix off |", "|---|---|---|"], 0
-    for i, ((fn, n), vo) in enumerate(zip(PLANS, VO)):
-        srt.append(f"{i + 1}\n{tc(t0)} --> {tc(t0 + n)}\n{vo}\n"); md.append(f"| {tc(t0, '.')[3:]} | {tc(t0 + n, '.')[3:]} | {vo} |"); t0 += n
-    open('episode_01_ar.srt', 'w').write("\n".join(srt)); open('episode_01_ar_voixoff.md', 'w').write("\n".join(md) + "\n")
+    ecrire_textes(PLANS, VO, 'episode_01_ar', 'Épisode 01')
     if 'stills' in sys.argv:
         for i, (fn, n) in enumerate(PLANS): fn(int(n * .85), n).convert("RGB").save(f'a1_{i:02d}.png')
         return
