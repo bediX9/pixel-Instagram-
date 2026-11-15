@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+moteur/fonts/
+moteur/land-10m.json
+moteur/scenes/
+moteur/stills/
+moteur/a1_*.png
+moteur/still_*.png
+node_modules/
